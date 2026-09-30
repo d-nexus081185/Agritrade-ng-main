@@ -1,0 +1,313 @@
+// AgriTrade database schema.
+//
+// SQLite is used for local development. Role/status columns are plain strings (validated in
+// lib/constants.ts) so the same schema also runs on PostgreSQL by changing `provider` below.
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "sqlite"
+  url      = env("DATABASE_URL")
+}
+
+model User {
+  id           String   @id @default(cuid())
+  email        String   @unique
+  /// NULL for accounts created through Google/Facebook that have not set a password yet
+  passwordHash String?
+  name         String
+  phone        String?
+  /// BUYER | SELLER | ADMIN
+  role         String   @default("BUYER")
+  /// ACTIVE | PENDING | SUSPENDED  (new sellers start PENDING until an admin approves them)
+  status       String   @default("ACTIVE")
+  /// Buyer business name / city (optional profile details)
+  companyName  String?
+  city         String?
+  state        String?
+  /// true for records created by prisma/seed.ts
+  isSample     Boolean  @default(false)
+  createdAt    DateTime @default(now())
+  updatedAt    DateTime @updatedAt
+
+  sessions       Session[]
+  oauthAccounts  OAuthAccount[]
+  resetTokens    PasswordResetToken[]
+  sellerProfile  SellerProfile?
+  savedProducts  SavedProduct[]
+  inquiries      Inquiry[]        @relation("BuyerInquiries")
+  messages       InquiryMessage[]
+  reportsFiled   Report[]         @relation("ReportsFiled")
+  reportsAgainst Report[]         @relation("ReportsAgainstUser")
+  orders         Order[]          @relation("BuyerOrders")
+  orderEvents    OrderEvent[]
+
+  @@index([role, status])
+}
+
+model Session {
+  id        String   @id @default(cuid())
+  /// SHA-256 of the random token stored in the httpOnly cookie
+  tokenHash String   @unique
+  userId    String
+  expiresAt DateTime
+  createdAt DateTime @default(now())
+  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([userId])
+}
+
+/// A Google or Facebook identity linked to a user, so they can sign in without a password.
+model OAuthAccount {
+  id                String   @id @default(cuid())
+  /// GOOGLE | FACEBOOK
+  provider          String
+  /// The provider's stable user id (Google `sub`, Facebook `id`)
+  providerAccountId String
+  userId            String
+  createdAt         DateTime @default(now())
+  user              User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@unique([provider, providerAccountId])
+  @@index([userId])
+}
+
+model PasswordResetToken {
+  id        String    @id @default(cuid())
+  tokenHash String    @unique
+  userId    String
+  expiresAt DateTime
+  usedAt    DateTime?
+  createdAt DateTime  @default(now())
+  user      User      @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([userId])
+}
+
+model SellerProfile {
+  id              String   @id @default(cuid())
+  userId          String   @unique
+  businessName    String
+  slug            String   @unique
+  description     String   @default("")
+  city            String
+  state           String
+  phone           String?
+  /// Comma-separated: DELIVERY,PICKUP
+  deliveryOptions String   @default("PICKUP")
+  yearsInBusiness Int?
+  /// Bank account that released escrow funds are paid out to
+  payoutBankName      String?
+  payoutAccountNumber String?
+  payoutAccountName   String?
+  createdAt       DateTime @default(now())
+  updatedAt       DateTime @updatedAt
+
+  user      User      @relation(fields: [userId], references: [id], onDelete: Cascade)
+  products  Product[]
+  inquiries Inquiry[]
+  orders    Order[]
+}
+
+model Category {
+  id          String    @id @default(cuid())
+  name        String    @unique
+  slug        String    @unique
+  description String    @default("")
+  imageUrl    String?
+  sortOrder   Int       @default(0)
+  createdAt   DateTime  @default(now())
+  products    Product[]
+}
+
+model Product {
+  id                String   @id @default(cuid())
+  sellerId          String
+  categoryId        String
+  title             String
+  slug              String   @unique
+  description       String
+  /// Unit of sale, e.g. "crate of 30", "50 kg bag", "tuber"
+  unit              String
+  /// Price per unit in whole Naira. NULL means "request a quote".
+  price             Int?
+  quantityAvailable Int      @default(0)
+  minOrderQty       Int      @default(1)
+  /// IN_STOCK | LIMITED | PRE_ORDER | OUT_OF_STOCK
+  availability      String   @default("IN_STOCK")
+  /// PENDING | ACTIVE | REJECTED | SUSPENDED
+  status            String   @default("PENDING")
+  city              String
+  state             String
+  /// Comma-separated: DELIVERY,PICKUP
+  deliveryOptions   String   @default("PICKUP")
+  isSample          Boolean  @default(false)
+  createdAt         DateTime @default(now())
+  updatedAt         DateTime @updatedAt
+
+  seller    SellerProfile  @relation(fields: [sellerId], references: [id], onDelete: Cascade)
+  category  Category       @relation(fields: [categoryId], references: [id], onDelete: Restrict)
+  images    ProductImage[]
+  savedBy   SavedProduct[]
+  inquiries Inquiry[]
+  reports   Report[]
+  orders    Order[]
+
+  @@index([status, categoryId])
+  @@index([state])
+  @@index([sellerId])
+}
+
+model ProductImage {
+  id        String  @id @default(cuid())
+  productId String
+  url       String
+  alt       String  @default("")
+  sortOrder Int     @default(0)
+  product   Product @relation(fields: [productId], references: [id], onDelete: Cascade)
+
+  @@index([productId])
+}
+
+model SavedProduct {
+  userId    String
+  productId String
+  createdAt DateTime @default(now())
+  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  product   Product  @relation(fields: [productId], references: [id], onDelete: Cascade)
+
+  @@id([userId, productId])
+}
+
+model Inquiry {
+  id                 String   @id @default(cuid())
+  /// Nullable so the conversation survives if the seller later deletes the listing.
+  productId          String?
+  /// Snapshot of the listing title at the time of the inquiry
+  productTitle       String
+  buyerId            String
+  sellerId           String
+  quantity           Int
+  /// DELIVERY | PICKUP
+  deliveryPreference String   @default("PICKUP")
+  /// OPEN | RESPONDED | CLOSED
+  status             String   @default("OPEN")
+  createdAt          DateTime @default(now())
+  updatedAt          DateTime @updatedAt
+
+  product  Product?         @relation(fields: [productId], references: [id], onDelete: SetNull)
+  buyer    User             @relation("BuyerInquiries", fields: [buyerId], references: [id], onDelete: Cascade)
+  seller   SellerProfile    @relation(fields: [sellerId], references: [id], onDelete: Cascade)
+  messages InquiryMessage[]
+  orders   Order[]
+
+  @@index([buyerId])
+  @@index([sellerId, status])
+}
+
+/// An order paid through AgriTrade. The buyer's money is held in escrow by the platform and only
+/// released to the seller once the buyer confirms delivery (or an admin resolves a dispute).
+model Order {
+  id              String    @id @default(cuid())
+  /// Human-friendly order number shown to users, e.g. AGT-7K2M9QXD
+  reference       String    @unique
+  inquiryId       String?
+  productId       String?
+  /// Snapshots taken when the seller issued the payment request
+  productTitle    String
+  unit            String
+  buyerId         String
+  sellerId        String
+  quantity        Int
+  /// All amounts are whole Naira
+  unitPrice       Int
+  deliveryFee     Int       @default(0)
+  /// quantity × unitPrice + deliveryFee: what the buyer pays into escrow
+  total           Int
+  /// AgriTrade commission kept on release
+  platformFee     Int       @default(0)
+  /// total − platformFee: what the seller receives on release
+  sellerAmount    Int
+  /// DELIVERY | PICKUP
+  deliveryMethod  String
+  note            String    @default("")
+  /// AWAITING_PAYMENT | IN_ESCROW | SHIPPED | COMPLETED | DISPUTED | REFUNDED | CANCELLED
+  status          String    @default("AWAITING_PAYMENT")
+  /// PAYSTACK | TEST
+  paymentProvider String?
+  /// Gateway transaction reference of the successful payment
+  paymentRef      String?   @unique
+  disputeReason   String?
+  /// NONE | PENDING | PAID: the transfer of released funds to the seller's bank account
+  payoutStatus    String    @default("NONE")
+  payoutRef       String?
+  paidAt          DateTime?
+  shippedAt       DateTime?
+  completedAt     DateTime?
+  refundedAt      DateTime?
+  cancelledAt     DateTime?
+  paidOutAt       DateTime?
+  isSample        Boolean   @default(false)
+  createdAt       DateTime  @default(now())
+  updatedAt       DateTime  @updatedAt
+
+  inquiry Inquiry?      @relation(fields: [inquiryId], references: [id], onDelete: SetNull)
+  product Product?      @relation(fields: [productId], references: [id], onDelete: SetNull)
+  buyer   User          @relation("BuyerOrders", fields: [buyerId], references: [id], onDelete: Cascade)
+  seller  SellerProfile @relation(fields: [sellerId], references: [id], onDelete: Cascade)
+  events  OrderEvent[]
+
+  @@index([buyerId, status])
+  @@index([sellerId, status])
+  @@index([status])
+  @@index([payoutStatus])
+}
+
+/// Audit trail of every change to an order's escrow state.
+model OrderEvent {
+  id        String   @id @default(cuid())
+  orderId   String
+  /// NULL for events raised by the payment gateway
+  actorId   String?
+  type      String
+  note      String   @default("")
+  createdAt DateTime @default(now())
+  order     Order    @relation(fields: [orderId], references: [id], onDelete: Cascade)
+  actor     User?    @relation(fields: [actorId], references: [id], onDelete: SetNull)
+
+  @@index([orderId])
+}
+
+model InquiryMessage {
+  id        String   @id @default(cuid())
+  inquiryId String
+  senderId  String
+  body      String
+  createdAt DateTime @default(now())
+  inquiry   Inquiry  @relation(fields: [inquiryId], references: [id], onDelete: Cascade)
+  sender    User     @relation(fields: [senderId], references: [id], onDelete: Cascade)
+
+  @@index([inquiryId])
+}
+
+model Report {
+  id             String   @id @default(cuid())
+  reporterId     String
+  productId      String?
+  reportedUserId String?
+  /// MISLEADING | PROHIBITED | FRAUD | QUALITY | OTHER
+  reason         String
+  details        String   @default("")
+  /// OPEN | RESOLVED | DISMISSED
+  status         String   @default("OPEN")
+  createdAt      DateTime @default(now())
+  resolvedAt     DateTime?
+
+  reporter     User     @relation("ReportsFiled", fields: [reporterId], references: [id], onDelete: Cascade)
+  product      Product? @relation(fields: [productId], references: [id], onDelete: SetNull)
+  reportedUser User?    @relation("ReportsAgainstUser", fields: [reportedUserId], references: [id], onDelete: SetNull)
+
+  @@index([status])
+}
