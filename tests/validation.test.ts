@@ -1,4 +1,5 @@
 import { describe, expect, it } from "vitest";
+import { visibleProviders } from "@/lib/auth/oauth";
 import {
   echoValues,
   formToObject,
@@ -111,6 +112,12 @@ describe("form helpers", () => {
 
   it("never echoes passwords or tokens back to the browser", () => {
     expect(echoValues({ email: "a@b.c", password: "x", confirmPassword: "y", currentPassword: "z", token: "t" })).toEqual({ email: "a@b.c" });
+  });
+});
+
+describe("visibleProviders", () => {
+  it("hides Facebook from the homepage sign-in options", () => {
+    expect(visibleProviders()).toEqual(["google"]);
   });
 });
 

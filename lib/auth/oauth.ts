@@ -45,12 +45,15 @@ export function isProviderConfigured(provider: OAuthProvider): boolean {
 }
 
 /**
- * Providers whose buttons appear on the sign-in page. In development every provider is shown so the
- * buttons can be seen before keys are added (clicking an unconfigured one explains what's missing).
+ * Providers whose buttons appear on the sign-in page. Facebook is intentionally hidden from the
+ * homepage sign-in flow, even if it is configured internally.
  */
 export function visibleProviders(): OAuthProvider[] {
-  if (process.env.NODE_ENV !== "production") return [...OAUTH_PROVIDERS];
-  return OAUTH_PROVIDERS.filter(isProviderConfigured);
+  const providers = process.env.NODE_ENV !== "production"
+    ? [...OAUTH_PROVIDERS]
+    : OAUTH_PROVIDERS.filter(isProviderConfigured);
+
+  return providers.filter((provider) => provider !== "facebook");
 }
 
 export function redirectUri(provider: OAuthProvider): string {
