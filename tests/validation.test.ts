@@ -26,6 +26,13 @@ describe("registerSchema", () => {
     expect(r.success && r.data.email).toBe("amaka@example.com");
   });
 
+  it("records WhatsApp consent only when checked", () => {
+    const optedIn = registerSchema.safeParse({ ...baseRegister, whatsappOptIn: "on" });
+    const optedOut = registerSchema.safeParse(baseRegister);
+    expect(optedIn.success && optedIn.data.whatsappOptIn).toBe(true);
+    expect(optedOut.success && optedOut.data.whatsappOptIn).toBe(false);
+  });
+
   it("rejects weak or mismatched passwords", () => {
     const weak = registerSchema.safeParse({ ...baseRegister, password: "short", confirmPassword: "short" });
     expect(weak.success).toBe(false);
@@ -125,6 +132,11 @@ describe("parseSocialRegistration", () => {
   it("accepts a buyer without name, email or password (they come from Google/Facebook)", () => {
     const r = parseSocialRegistration({ role: "BUYER", terms: "on", password: "", confirmPassword: "" });
     expect(r.success).toBe(true);
+  });
+
+  it("retains WhatsApp consent for social registration", () => {
+    const r = parseSocialRegistration({ role: "BUYER", terms: "on", whatsappOptIn: "on" });
+    expect(r.success && r.data.whatsappOptIn).toBe(true);
   });
 
   it("still requires seller details and the terms", () => {

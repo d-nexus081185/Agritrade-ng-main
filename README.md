@@ -47,6 +47,8 @@ Admins can't sign up through the UI. Create them with the seed script or directl
 | `APP_URL` | Public base URL used in password-reset links. |
 | `SEED_DEMO_PASSWORD` | Password for sample accounts. The seed script refuses to run without it, and refuses in production unless `ALLOW_PRODUCTION_SEED=true`. |
 | `UPLOAD_DIR` | Where uploaded listing photos are stored (default `./uploads`). |
+| `WHATSAPP_PHONE_NUMBER_ID`, `WHATSAPP_ACCESS_TOKEN` | Meta WhatsApp Cloud API credentials. Leave unset to disable welcome messages. |
+| `WHATSAPP_WELCOME_TEMPLATE`, `WHATSAPP_TEMPLATE_LANGUAGE`, `WHATSAPP_API_VERSION` | Approved template name, language (default `en_US`), and Graph API version (default `v23.0`). The template must have one body variable for the user's name. |
 | `PAYSTACK_SECRET_KEY` | Paystack secret key (`sk_test_…` or `sk_live_…`). Without it, development uses a simulated checkout and production can't take payments. |
 | `PLATFORM_FEE_PERCENT` | AgriTrade's commission, deducted from the seller's share when escrow is released (default `0`). |
 
@@ -61,6 +63,8 @@ Search automatically switches to case-insensitive matching on PostgreSQL (`lib/d
 ## Features
 
 **Sign-up and sign-in (the first page, `/`).** Tabs switch between signing in and creating an account. Two clear cards let people choose buyer or seller; seller-only fields appear when "I'm selling" is chosen. Includes inline validation, a password strength meter, show/hide password, rate limiting, and a full password-reset flow (`/forgot-password` → `/reset-password`). After sign-in, each role goes to its own dashboard.
+
+New users who provide a phone number and opt in receive a one-time WhatsApp welcome message after account creation. Configure the Meta WhatsApp Cloud API variables above and create an approved message template with one body parameter (`{{1}}`, the user's name). Numbers entered without an international prefix are treated as Nigerian numbers.
 
 **Marketplace.**
 - `/marketplace` is the landing page: hero search, category tiles, latest offers and how it works.
@@ -136,7 +140,7 @@ Accessibility:
 | Product photography | Real photos from Wikimedia Commons (mostly Nigerian markets and farms), stored in `public/images`. Credits and licences are at `/credits` and in `public/images/credits.json`. Refresh them with `npm run images:fetch`. |
 | Password-reset **email** | **Not connected.** The token and link are generated and stored for real, but no email is sent. In development the link appears on screen and in the server log. Plug a provider into `forgotPasswordAction` in `app/actions/auth.ts`. |
 | Payments | **Escrow through Paystack** (see above). Seller payouts are bank transfers that an admin makes and then records. Automating them with Paystack Transfers is a possible next step. |
-| Ratings, notifications | **Not implemented.** |
+| Ratings and other notifications | **Not implemented.** WhatsApp account welcome messages are supported when configured and explicitly opted into. |
 
 ## Project structure
 

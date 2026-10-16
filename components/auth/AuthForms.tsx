@@ -254,6 +254,13 @@ function RegisterForm({ initialRole, providers }: { initialRole: "BUYER" | "SELL
         </div>
       )}
 
+      <div className="field">
+        <label className="checkbox">
+          <input type="checkbox" name="whatsappOptIn" />
+          <span>Send me a one-time WhatsApp welcome message if I provide a valid phone number.</span>
+        </label>
+      </div>
+
       <PasswordField
         name="password"
         label="Password"

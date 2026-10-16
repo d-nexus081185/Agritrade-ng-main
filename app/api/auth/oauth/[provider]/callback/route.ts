@@ -17,6 +17,7 @@ import {
 import { dashboardPathFor, safeRedirectPath } from "@/lib/access";
 import { rateLimit } from "@/lib/rate-limit";
 import { uniqueSlug } from "@/lib/slug";
+import { sendWelcomeWhatsApp } from "@/lib/whatsapp";
 import { socialSignupSchema, type SocialSignup } from "@/lib/validation";
 
 function readJson(value: string | undefined): unknown {
@@ -74,6 +75,7 @@ export async function GET(req: NextRequest, { params }: { params: Promise<{ prov
   if (intent !== "register" || !signup.success) redirect(`/?mode=register&oauthNoAccount=1&provider=${provider}`);
 
   const created = await createSocialUser(provider, profile as OAuthProfile & { email: string }, signup.data);
+  if (signup.data.whatsappOptIn) await sendWelcomeWhatsApp(created.phone, created.name);
   await createSession(created.id);
   redirect(`${dashboardPathFor(created.role)}?welcome=1`);
 }

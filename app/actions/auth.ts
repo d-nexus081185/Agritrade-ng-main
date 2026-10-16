@@ -19,6 +19,7 @@ import { dashboardPathFor, safeRedirectPath } from "@/lib/access";
 import { rateLimit, resetRateLimit } from "@/lib/rate-limit";
 import { RESET_TOKEN_TTL_MINUTES } from "@/lib/constants";
 import { uniqueSlug } from "@/lib/slug";
+import { sendWelcomeWhatsApp } from "@/lib/whatsapp";
 import {
   echoValues,
   fieldError,
@@ -90,6 +91,7 @@ export async function registerAction(_prev: ActionState, formData: FormData): Pr
     },
   });
 
+  if (v.whatsappOptIn) await sendWelcomeWhatsApp(user.phone, user.name);
   await createSession(user.id);
   redirect(`${dashboardPathFor(user.role)}?welcome=1`);
 }

@@ -58,6 +58,7 @@ export const registerSchema = z
     name: z.string().trim().min(2, "Enter your full name.").max(80),
     email,
     phone,
+    whatsappOptIn: z.literal("on").optional().transform((v) => v === "on"),
     password: passwordSchema,
     confirmPassword: z.string(),
     businessName: optionalText(100),
@@ -86,6 +87,7 @@ export const socialSignupSchema = z
   .object({
     role: z.enum(["BUYER", "SELLER"], { errorMap: () => ({ message: "Choose how you'll use AgriTrade." }) }),
     phone,
+    whatsappOptIn: z.literal("on").optional().transform((v) => v === "on"),
     businessName: optionalText(100),
     city: optionalText(60),
     state: z.string().optional(),
